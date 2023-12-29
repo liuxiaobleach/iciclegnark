@@ -51,7 +51,7 @@ func MsmOnDevice(scalars_d, points_d unsafe.Pointer, count int, convert bool) (b
 }
 
 func MsmG2OnDevice(scalars_d, points_d unsafe.Pointer, count int, convert bool) (bw6761.G2Jac, unsafe.Pointer, error) {
-	pointBytes := fp.Bytes * 6 // 6 Elements because of 3 coordinates each with real and imaginary elements
+	pointBytes := fp.Bytes * 3
 	out_d, _ := goicicle.CudaMalloc(pointBytes)
 
 	icicle.CommitG2(out_d, scalars_d, points_d, count, 10)
