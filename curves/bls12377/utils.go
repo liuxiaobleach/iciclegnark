@@ -2,53 +2,50 @@ package bls12377
 
 import (
 	"fmt"
-	"unsafe"
 
-	bls12377 "github.com/consensys/gnark-crypto/ecc/bls12-377"
+	bls12_377 "github.com/consensys/gnark-crypto/ecc/bls12-377"
 	"github.com/consensys/gnark-crypto/ecc/bls12-377/fp"
 	"github.com/consensys/gnark-crypto/ecc/bls12-377/fr"
-	icicle "github.com/ingonyama-zk/icicle/goicicle/curves/bls12377"
-	goicicle "github.com/ingonyama-zk/icicle/goicicle"
+	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
+	icicle_bls12_377 "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bls12377"
 )
 
-func CopyToDevice(scalars []fr.Element, bytes int, copyDone chan unsafe.Pointer) {
-	devicePtr, _ := goicicle.CudaMalloc(bytes)
-	goicicle.CudaMemCpyHtoD[fr.Element](devicePtr, scalars, bytes)
-	MontConvOnDevice(devicePtr, len(scalars), false)
+func CopyScalarsToDevice(scalars []fr.Element, copyDone chan core.DeviceSlice) {
+	icicleScalars := core.HostSliceFromElements(BatchConvertFromFrGnark(scalars))
 
-	copyDone <- devicePtr
+	var deviceScalars core.DeviceSlice
+	icicleScalars.CopyToDevice(&deviceScalars, true)
+	icicle_bls12_377.AffineFromMontgomery(&deviceScalars)
+
+	copyDone <- deviceScalars
 }
 
-func CopyPointsToDevice(points []bls12377.G1Affine, pointsBytes int, copyDone chan unsafe.Pointer) {
-	if pointsBytes == 0 {
-		copyDone <- nil
+func CopyPointsToDevice(points []bls12_377.G1Affine, copyDone chan core.DeviceSlice) {
+	var devicePonts core.DeviceSlice
+	if len(points) == 0 {
+		copyDone <- devicePonts
 	} else {
-		devicePtr, _ := goicicle.CudaMalloc(pointsBytes)
-		iciclePoints := BatchConvertFromG1Affine(points)
-		goicicle.CudaMemCpyHtoD[icicle.G1PointAffine](devicePtr, iciclePoints, pointsBytes)
-		
-		copyDone <- devicePtr
+		iciclePoints := core.HostSliceFromElements(BatchConvertFromG1Affine(points))
+		iciclePoints.CopyToDevice(&devicePonts, true)
+
+		copyDone <- devicePonts
 	}
 }
 
-func CopyG2PointsToDevice(points []bls12377.G2Affine, pointsBytes int, copyDone chan unsafe.Pointer) {
-	if pointsBytes == 0 {
-		copyDone <- nil
-	} else {
-		devicePtr, _ := goicicle.CudaMalloc(pointsBytes)
-		iciclePoints := BatchConvertFromG2Affine(points)
-		goicicle.CudaMemCpyHtoD[icicle.G2PointAffine](devicePtr, iciclePoints, pointsBytes)
-		
-		copyDone <- devicePtr
-	}
+func HostSliceFromScalars(gnarkScalars []fr.Element) core.HostSlice[icicle_bls12_377.ScalarField] {
+	return core.HostSliceFromElements(BatchConvertFromFrGnark(gnarkScalars))
 }
 
-func FreeDevicePointer(ptr unsafe.Pointer) {
-	goicicle.CudaFree(ptr)
+func HostSliceFromPoints(gnarkPoints []bls12_377.G1Affine) core.HostSlice[icicle_bls12_377.Affine] {
+	return core.HostSliceFromElements(BatchConvertFromG1Affine(gnarkPoints))
 }
 
-func ScalarToGnarkFr(f *icicle.G1ScalarField) *fr.Element {
-	fb := f.ToBytesLe()
+func FreeDeviceSlice(deviceSlice core.DeviceSlice) {
+	deviceSlice.Free()
+}
+
+func ScalarToGnarkFr(f *icicle_bls12_377.ScalarField) *fr.Element {
+	fb := f.ToBytesLittleEndian()
 	var b32 [32]byte
 	copy(b32[:], fb[:32])
 
@@ -61,12 +58,12 @@ func ScalarToGnarkFr(f *icicle.G1ScalarField) *fr.Element {
 	return &v
 }
 
-func ScalarToGnarkFp(f *icicle.G1ScalarField) *fp.Element {
-	fb := f.ToBytesLe()
-	var b32 [48]byte
-	copy(b32[:], fb[:48])
+func ScalarToGnarkFp(f *icicle_bls12_377.ScalarField) *fp.Element {
+	fb := f.ToBytesLittleEndian()
+	var b48 [48]byte
+	copy(b48[:], fb[:48])
 
-	v, e := fp.LittleEndian.Element(&b32)
+	v, e := fp.LittleEndian.Element(&b48)
 
 	if e != nil {
 		panic(fmt.Sprintf("unable to create convert point %v got error %v", f, e))
@@ -75,8 +72,8 @@ func ScalarToGnarkFp(f *icicle.G1ScalarField) *fp.Element {
 	return &v
 }
 
-func BatchConvertFromFrGnark(elements []fr.Element) []icicle.G1ScalarField {
-	var newElements []icicle.G1ScalarField
+func BatchConvertFromFrGnark(elements []fr.Element) []icicle_bls12_377.ScalarField {
+	var newElements []icicle_bls12_377.ScalarField
 	for _, e := range elements {
 		converted := NewFieldFromFrGnark(e)
 		newElements = append(newElements, *converted)
@@ -85,17 +82,17 @@ func BatchConvertFromFrGnark(elements []fr.Element) []icicle.G1ScalarField {
 	return newElements
 }
 
-func BatchConvertFromFrGnarkThreaded(elements []fr.Element, routines int) []icicle.G1ScalarField {
-	var newElements []icicle.G1ScalarField
+func BatchConvertFromFrGnarkThreaded(elements []fr.Element, routines int) []icicle_bls12_377.ScalarField {
+	var newElements []icicle_bls12_377.ScalarField
 
 	if routines > 1 && routines <= len(elements) {
-		channels := make([]chan []icicle.G1ScalarField, routines)
+		channels := make([]chan []icicle_bls12_377.ScalarField, routines)
 		for i := 0; i < routines; i++ {
-			channels[i] = make(chan []icicle.G1ScalarField, 1)
+			channels[i] = make(chan []icicle_bls12_377.ScalarField, 1)
 		}
 
 		convert := func(elements []fr.Element, chanIndex int) {
-			var convertedElements []icicle.G1ScalarField
+			var convertedElements []icicle_bls12_377.ScalarField
 			for _, e := range elements {
 				converted := NewFieldFromFrGnark(e)
 				convertedElements = append(convertedElements, *converted)
@@ -128,7 +125,7 @@ func BatchConvertFromFrGnarkThreaded(elements []fr.Element, routines int) []icic
 	return newElements
 }
 
-func BatchConvertG1BaseFieldToFrGnark(elements []icicle.G1BaseField) []fr.Element {
+func BatchConvertBaseFieldToFrGnark(elements []icicle_bls12_377.BaseField) []fr.Element {
 	var newElements []fr.Element
 	for _, e := range elements {
 		converted := BaseFieldToGnarkFr(&e)
@@ -138,7 +135,7 @@ func BatchConvertG1BaseFieldToFrGnark(elements []icicle.G1BaseField) []fr.Elemen
 	return newElements
 }
 
-func BatchConvertG1ScalarFieldToFrGnark(elements []icicle.G1ScalarField) []fr.Element {
+func BatchConvertScalarFieldToFrGnark(elements []icicle_bls12_377.ScalarField) []fr.Element {
 	var newElements []fr.Element
 	for _, e := range elements {
 		converted := ScalarToGnarkFr(&e)
@@ -148,7 +145,7 @@ func BatchConvertG1ScalarFieldToFrGnark(elements []icicle.G1ScalarField) []fr.El
 	return newElements
 }
 
-func BatchConvertG1BaseFieldToFrGnarkThreaded(elements []icicle.G1BaseField, routines int) []fr.Element {
+func BatchConvertBaseFieldToFrGnarkThreaded(elements []icicle_bls12_377.BaseField, routines int) []fr.Element {
 	var newElements []fr.Element
 
 	if routines > 1 {
@@ -157,7 +154,7 @@ func BatchConvertG1BaseFieldToFrGnarkThreaded(elements []icicle.G1BaseField, rou
 			channels[i] = make(chan []fr.Element, 1)
 		}
 
-		convert := func(elements []icicle.G1BaseField, chanIndex int) {
+		convert := func(elements []icicle_bls12_377.BaseField, chanIndex int) {
 			var convertedElements []fr.Element
 			for _, e := range elements {
 				converted := BaseFieldToGnarkFr(&e)
@@ -186,7 +183,7 @@ func BatchConvertG1BaseFieldToFrGnarkThreaded(elements []icicle.G1BaseField, rou
 	return newElements
 }
 
-func BatchConvertG1ScalarFieldToFrGnarkThreaded(elements []icicle.G1ScalarField, routines int) []fr.Element {
+func BatchConvertScalarFieldToFrGnarkThreaded(elements []icicle_bls12_377.ScalarField, routines int) []fr.Element {
 	var newElements []fr.Element
 
 	if routines > 1 {
@@ -195,7 +192,7 @@ func BatchConvertG1ScalarFieldToFrGnarkThreaded(elements []icicle.G1ScalarField,
 			channels[i] = make(chan []fr.Element, 1)
 		}
 
-		convert := func(elements []icicle.G1ScalarField, chanIndex int) {
+		convert := func(elements []icicle_bls12_377.ScalarField, chanIndex int) {
 			var convertedElements []fr.Element
 			for _, e := range elements {
 				converted := ScalarToGnarkFr(&e)
@@ -224,42 +221,30 @@ func BatchConvertG1ScalarFieldToFrGnarkThreaded(elements []icicle.G1ScalarField,
 	return newElements
 }
 
-func NewFieldFromFrGnark(element fr.Element) *icicle.G1ScalarField {
-	S := icicle.ConvertUint64ArrToUint32Arr4(element.Bits()) // get non-montgomry
+func NewFieldFromFrGnark(element fr.Element) *icicle_bls12_377.ScalarField {
+	element_bits := element.Bits()
+	s := core.ConvertUint64ArrToUint32Arr(element_bits[:]) // get non-montgomry
 
-	return &icicle.G1ScalarField{S: S}
+	var field icicle_bls12_377.ScalarField
+	field.FromLimbs(s)
+	return &field
 }
 
-func NewFieldFromFpGnark(element fp.Element) *icicle.G1BaseField {
-	S := icicle.ConvertUint64ArrToUint32Arr6(element.Bits()) // get non-montgomry
+func NewFieldFromFpGnark(element fp.Element) *icicle_bls12_377.BaseField {
+	element_bits := element.Bits()
+	s := core.ConvertUint64ArrToUint32Arr(element_bits[:]) // get non-montgomry
 
-	return &icicle.G1BaseField{S: S}
+	var field icicle_bls12_377.BaseField
+	field.FromLimbs(s)
+	return &field
 }
 
-func BaseFieldToGnarkFr(f *icicle.G1BaseField) *fr.Element {
-	fb := f.ToBytesLe()
-	var b32 [32]byte
-	copy(b32[:], fb[:32])
-
-	v, e := fr.LittleEndian.Element(&b32)
-
-	if e != nil {
-		panic(fmt.Sprintf("unable to convert point %v got error %v", f, e))
-	}
-
+func BaseFieldToGnarkFr(f *icicle_bls12_377.BaseField) *fr.Element {
+	v, _ := fr.LittleEndian.Element((*[fr.Bytes]byte)(f.ToBytesLittleEndian()))
 	return &v
 }
 
-func BaseFieldToGnarkFp(f *icicle.G1BaseField) *fp.Element {
-	fb := f.ToBytesLe()
-	var b32 [48]byte
-	copy(b32[:], fb[:48])
-
-	v, e := fp.LittleEndian.Element(&b32)
-
-	if e != nil {
-		panic(fmt.Sprintf("unable to convert point %v got error %v", f, e))
-	}
-
+func BaseFieldToGnarkFp(f *icicle_bls12_377.BaseField) *fp.Element {
+	v, _ := fp.LittleEndian.Element((*[fp.Bytes]byte)(f.ToBytesLittleEndian()))
 	return &v
 }

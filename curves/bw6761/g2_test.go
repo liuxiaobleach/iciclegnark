@@ -16,7 +16,7 @@
 
 //go:build g2
 
-package bn254
+package bw6761
 
 import (
 	"fmt"
@@ -25,14 +25,14 @@ import (
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
-	bn254 "github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/g2"
+	bw6_761 "github.com/consensys/gnark-crypto/ecc/bw6-761"
+	"github.com/consensys/gnark-crypto/ecc/bw6-761/fr"
+	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bw6761/g2"
 	"github.com/stretchr/testify/assert"
 )
 
-func randG2Jac() (bn254.G2Jac, error) {
-	var point bn254.G2Jac
+func randG2Jac() (bw6_761.G2Jac, error) {
+	var point bw6_761.G2Jac
 	var scalar fr.Element
 
 	_, err := scalar.SetRandom()
@@ -40,7 +40,7 @@ func randG2Jac() (bn254.G2Jac, error) {
 		return point, err
 	}
 
-	_, genG2Jac, _, _ := bn254.Generators()
+	_, genG2Jac, _, _ := bw6_761.Generators()
 
 	randomBigInt := big.NewInt(1000)
 
@@ -48,10 +48,10 @@ func randG2Jac() (bn254.G2Jac, error) {
 	return point, nil
 }
 
-func GenerateG2Points(count int) ([]g2.G2Affine, []bn254.G2Affine) {
+func GenerateG2Points(count int) ([]g2.G2Affine, []bw6_761.G2Affine) {
 	// Declare a slice of integers
 	var points []g2.G2Affine
-	var pointsAffine []bn254.G2Affine
+	var pointsAffine []bw6_761.G2Affine
 
 	// populate the slice
 	for i := 0; i < 10; i++ {
@@ -60,7 +60,7 @@ func GenerateG2Points(count int) ([]g2.G2Affine, []bn254.G2Affine) {
 		var p g2.G2Affine
 		G2PointAffineFromGnarkJac(&gnarkP, &p)
 
-		var gp bn254.G2Affine
+		var gp bw6_761.G2Affine
 		gp.FromJacobian(&gnarkP)
 		pointsAffine = append(pointsAffine, gp)
 		points = append(points, p)
@@ -104,7 +104,7 @@ func TestMsmG2(t *testing.T) {
 		res, e := G2MsmOnDevice(gnarkPoints, gnarkScalars)
 		assert.Equal(t, e, nil, "error should be nil")
 
-		var AffineLib bn254.G2Affine
+		var AffineLib bw6_761.G2Affine
 
 		gResult, _ := AffineLib.MultiExp(gnarkPoints, gnarkScalars, ecc.MultiExpConfig{})
 

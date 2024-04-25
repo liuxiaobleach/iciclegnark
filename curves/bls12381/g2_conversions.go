@@ -1,22 +1,22 @@
 //go:build g2
 
-package bn254
+package bls12381
 
 import (
 	"fmt"
+	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bls12381/g2"
 
-	bn254 "github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	bls12_381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
+	"github.com/consensys/gnark-crypto/ecc/bls12-381/fp"
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/g2"
 )
 
 func ToGnarkFp(f *g2.G2BaseField) *fp.Element {
 	fb := f.ToBytesLittleEndian()
-	var b32 [32]byte
-	copy(b32[:], fb[:32])
+	var b48 [48]byte
+	copy(b48[:], fb[:48])
 
-	v, e := fp.LittleEndian.Element(&b32)
+	v, e := fp.LittleEndian.Element(&b48)
 
 	if e != nil {
 		panic(fmt.Sprintf("unable to convert point %v; got error %v", f, e))
@@ -25,42 +25,42 @@ func ToGnarkFp(f *g2.G2BaseField) *fp.Element {
 	return &v
 }
 
-func ToGnarkE2(f *g2.G2BaseField) bn254.E2 {
+func ToGnarkE2(f *g2.G2BaseField) bls12_381.E2 {
 	bytes := f.ToBytesLittleEndian()
 	a0, _ := fp.LittleEndian.Element((*[fp.Bytes]byte)(bytes[:len(bytes)/2]))
 	a1, _ := fp.LittleEndian.Element((*[fp.Bytes]byte)(bytes[len(bytes)/2:]))
-	return bn254.E2{
+	return bls12_381.E2{
 		A0: a0,
 		A1: a1,
 	}
 }
 
-func GnarkE2Bits(f *bn254.E2) []uint64 {
+func GnarkE2Bits(f *bls12_381.E2) []uint64 {
 	a0 := f.A0.Bits()
 	a1 := f.A1.Bits()
 	return append(a0[:], a1[:]...)
 }
 
-func FromGnarkE2(f *bn254.E2) g2.G2BaseField {
+func FromGnarkE2(f *bls12_381.E2) g2.G2BaseField {
 	var field g2.G2BaseField
 	field.FromLimbs(core.ConvertUint64ArrToUint32Arr(GnarkE2Bits(f)))
 	return field
 }
 
-func G2PointToGnarkJac(p *g2.G2Projective) *bn254.G2Jac {
+func G2PointToGnarkJac(p *g2.G2Projective) *bls12_381.G2Jac {
 	x := ToGnarkE2(&p.X)
 	y := ToGnarkE2(&p.Y)
 	z := ToGnarkE2(&p.Z)
-	var zSquared bn254.E2
+	var zSquared bls12_381.E2
 	zSquared.Mul(&z, &z)
 
-	var X bn254.E2
+	var X bls12_381.E2
 	X.Mul(&x, &z)
 
-	var Y bn254.E2
+	var Y bls12_381.E2
 	Y.Mul(&y, &zSquared)
 
-	after := bn254.G2Jac{
+	after := bls12_381.G2Jac{
 		X: X,
 		Y: Y,
 		Z: z,
@@ -69,26 +69,26 @@ func G2PointToGnarkJac(p *g2.G2Projective) *bn254.G2Jac {
 	return &after
 }
 
-func G2PointToGnarkAffine(p *g2.G2Projective) *bn254.G2Affine {
-	var affine bn254.G2Affine
+func G2PointToGnarkAffine(p *g2.G2Projective) *bls12_381.G2Affine {
+	var affine bls12_381.G2Affine
 	affine.FromJacobian(G2PointToGnarkJac(p))
 	return &affine
 }
 
-func G2AffineFromGnarkAffine(gnark *bn254.G2Affine, g *g2.G2Affine) *g2.G2Affine {
+func G2AffineFromGnarkAffine(gnark *bls12_381.G2Affine, g *g2.G2Affine) *g2.G2Affine {
 	g.X = FromGnarkE2(&gnark.X)
 	g.Y = FromGnarkE2(&gnark.Y)
 	return g
 }
 
-func G2PointAffineFromGnarkJac(gnark *bn254.G2Jac, g *g2.G2Affine) *g2.G2Affine {
-	var pointAffine bn254.G2Affine
+func G2PointAffineFromGnarkJac(gnark *bls12_381.G2Jac, g *g2.G2Affine) *g2.G2Affine {
+	var pointAffine bls12_381.G2Affine
 	pointAffine.FromJacobian(gnark)
 
 	return G2AffineFromGnarkAffine(&pointAffine, g)
 }
 
-func BatchConvertFromG2Affine(elements []bn254.G2Affine) []g2.G2Affine {
+func BatchConvertFromG2Affine(elements []bls12_381.G2Affine) []g2.G2Affine {
 	var newElements []g2.G2Affine
 	for _, gg2Affine := range elements {
 		var newElement g2.G2Affine
@@ -99,7 +99,7 @@ func BatchConvertFromG2Affine(elements []bn254.G2Affine) []g2.G2Affine {
 	return newElements
 }
 
-func BatchConvertFromG2AffineThreaded(elements []bn254.G2Affine, routines int) []g2.G2Affine {
+func BatchConvertFromG2AffineThreaded(elements []bls12_381.G2Affine, routines int) []g2.G2Affine {
 	var newElements []g2.G2Affine
 
 	if routines > 1 && routines <= len(elements) {
@@ -108,7 +108,7 @@ func BatchConvertFromG2AffineThreaded(elements []bn254.G2Affine, routines int) [
 			channels[i] = make(chan []g2.G2Affine, 1)
 		}
 
-		convert := func(elements []bn254.G2Affine, chanIndex int) {
+		convert := func(elements []bls12_381.G2Affine, chanIndex int) {
 			var convertedElements []g2.G2Affine
 			for _, e := range elements {
 				var converted g2.G2Affine
