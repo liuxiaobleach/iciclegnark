@@ -7,8 +7,8 @@ github.com/consensys/gnark-crypto v0.12.2-0.20231208203441-d4eab6ddd2af/go.mod h
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/subcommands v1.2.0/go.mod h1:ZjhPrFU+Olkh9WazFPsl27BQ4UPiG37m3yTrtFlrHVk=
-github.com/ingonyama-zk/icicle/v2 v2.0.2 h1:9eNDqgS/4tmxGk5owbJ7+eTwLY35f1T3aHp6aQDcgJU=
-github.com/ingonyama-zk/icicle/v2 v2.0.2/go.mod h1:rr3B+xKQKW1U40A+vEzA4hI2ilTrPSJBtxedfnaUYHw=
+github.com/ingonyama-zk/icicle/v2 v2.0.3 h1:qNFXWQqUuOdJXh+25lIdCRJLqLrUwPkAfcK4wJXBap0=
+github.com/ingonyama-zk/icicle/v2 v2.0.3/go.mod h1:rr3B+xKQKW1U40A+vEzA4hI2ilTrPSJBtxedfnaUYHw=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/leanovate/gopter v0.2.9 h1:fQjYxZaynp97ozCzfOyOuAGOU4aU/z37zf/tOujFk7c=
